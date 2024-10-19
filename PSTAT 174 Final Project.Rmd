@@ -1,0 +1,148 @@
+---
+title: "PSTAT 174 Final Project"
+author: "Catherine Li"
+date: "June 2024"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Data and Packages
+```{r }
+# Load libraries 
+library(readr)
+library(forecast) 
+library(ggplot2)
+library(astsa)
+
+# Load dataset
+LVMUY <- read_csv("/Users/catherineli/Downloads/LVMUY.csv")
+
+# Preview dataset
+head(LVMUY)
+str(LVMUY)
+```
+
+# 4.1 Results from SARIMA (p,d,q) x (P,D,Q)
+```{r }
+# Plot Time Series Data 
+# Convert date column to Date type
+LVMUY$Date <- as.Date(LVMUY$Date, format="%Y-%m-%d")
+
+# Plot the time series data
+og_plot <- ggplot(LVMUY, aes(x=Date, y=Close)) +
+  geom_line() +
+  labs(title="LVMUY Stock Prices Over Time", x="Year", y="Closing Price") +
+  scale_x_date(date_labels="%Y", date_breaks="5 years") +
+  theme_minimal()
+print(og_plot)
+
+# Plot ACF and PACF on original data
+par(mfrow=c(1, 2))
+acf(LVMUY$Close, main = "ACF of Closing Prices")
+pacf(LVMUY$Close, main = "PACF of Closing Prices")
+```
+
+```{r }
+# Apply log transformation
+log_data <- log(LVMUY$Close)
+print(head(log_data))
+
+# Differencing the log-transformed data
+diff_log_data <- diff(log_data)
+print(head(diff_log_data))
+
+# Create new data frame with difference log values 
+LVMUY_diff <- data.frame(Date=LVMUY$Date[-1], Log_Close_Diff = diff_log_data)
+
+# Plot time series with new log-transformed data 
+log_plot <- ggplot(LVMUY_diff, aes(x=Date, y=Log_Close_Diff)) + geom_line() +
+  labs(title="Differenced Log-Transformed Closing Prices", x="Year", y="Differenced Log Closing Prices")
+print(log_plot)
+```
+
+```{r }
+# Plot 
+acf(LVMUY_diff$Log_Close_Diff, main = "ACF of Differenced Log-Transformed Closing Prices")
+pacf(LVMUY_diff$Log_Close_Diff, main = "PACF of Differenced Log-Transformed Closing Prices")
+```
+
+```{r }
+acf2(diff_log_data, max.lag=100)
+acf2(diff(log_data, lag=1))
+acf2(diff(log_data, lag=2))
+acf2(diff(log_data, lag=3))
+```
+# ACF plot: significant spike at lag 1 --> MA(1) 
+# PACF plot: significant spike at lag 1 --> AR(1)
+
+# Fit various SARIMA models
+```{r }
+sarima(diff_log_data, 0, 0, 5, 0, 0, 0)
+sarima(diff_log_data, 1, 0, 5, 0, 0, 0)
+sarima(diff_log_data, 0, 1, 1, 0, 0, 0)
+sarima(diff_log_data, 1, 1, 1, 0, 0, 0)
+```
+# Based on this, ARIMA(1,0,5) has the lowest AIC, AICc, and BIC. This suggests that this could be the best model.
+
+# SARIMA Model
+```{r }
+best_model <- arima(diff_log_data, order=c(1,0,5))
+summary(best_model)
+```
+
+# Diagnostic plots 
+```{r }
+par(mfrow = c(2, 2))
+plot.ts(residuals(best_model), main="Standardized Residuals")
+acf(residuals(best_model), main="ACF - Residuals")
+qqnorm(residuals(best_model))
+qqline(residuals(best_model))
+Box.test(residuals(best_model), lag=20, type="Ljung-Box")
+```
+
+# Forecast future values 
+```{r }
+# Forecast future values over 12 periods
+forecasted_values <- forecast(best_model, h=12)
+
+# Plot forecasted values
+autoplot(forecasted_values) +
+  ggtitle("Forecast of Differenced Log-Transformed Closing Prices") + xlab("Year") + ylab("Differenced Log Closing Prices") + scale_x_continuous(breaks = seq(2024, 2030, by = 8))
+```
+
+
+# 4.2 Spectral Analysis 
+```{r }
+library(TSA)
+
+# Calculate the periodogram of the differenced log-transformed data
+spec_LVMUY <- spectrum(diff_log_data, plot = FALSE)
+log_spec_LVMUY <- log(spec_LVMUY$spec)
+
+# Plotting the periodogram and log periodogram
+par(mfrow = c(1, 2))
+plot(spec_LVMUY$freq, spec_LVMUY$spec, type = "l", main = "Periodogram of LVMUY Data", xlab = "Frequency", ylab = "Spectral Density")
+plot(spec_LVMUY$freq, log_spec_LVMUY, type = "l", main = "Log-Periodogram of LVMUY Data", xlab = "Frequency", ylab = "Log-Spectral Density")
+```
+
+```{r }
+# Compute the smoothed periodogram with the Daniell kernel
+spec_LVMUY_smoothed <- mvspec(diff_log_data, kernel = kernel("daniell", 7), log = "no")
+
+# Plot the smoothed periodogram
+plot(spec_LVMUY_smoothed)
+abline(v = 1/12, lty = 2) 
+```
+
+```{r }
+# Fit the linear model on the log-periodogram
+freq <- spec_LVMUY$freq
+log_spec <- log(spec_LVMUY$spec)
+lm_spec <- lm(log_spec ~ freq)
+summary(lm_spec)
+```
