@@ -1,5 +1,5 @@
 ---
-title: "PSTAT 174 Final Project"
+title: "LVMH Stock Analysis Report"
 author: "Catherine Li"
 date: "June 2024"
 output: 
