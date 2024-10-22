@@ -1,6 +1,6 @@
-# LVMH Stock Analysis Report
+# LVMH Stock Analysis
 
-Project Overview: This report analyzes the stock performance of LVMH (LVMUY) using time series forecasting and spectral analysis. By applying the Seasonal Autoregressive Integrated Moving Average (SARIMA) model, we aim to identify trends and predict future stock prices.
+Project Overview: This time series project analyzes the stock performance of LVMH (LVMUY) using time series forecasting and spectral analysis. By applying the Seasonal Autoregressive Integrated Moving Average (SARIMA) model, we aim to identify trends and predict future stock prices.
 
 *Data and Methodology:*
 * The dataset contains historical closing prices of LVMH stock.
